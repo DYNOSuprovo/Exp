@@ -1,14 +1,28 @@
 import os
 import streamlit as st
 import google.generativeai as genai
+import os
+import streamlit as st
+import google.generativeai as genai
 import spacy
 
+# ---------------- Ensure SpaCy Model is Installed ----------------
+spacy_model = "en_core_web_sm"
+
 try:
-    nlp = spacy.load("en_core_web_sm")
+    nlp = spacy.load(spacy_model)
 except OSError:
-    from spacy.cli import download
-    download("en_core_web_sm")
-    nlp = spacy.load("en_core_web_sm")
+    st.error(f"⚠️ Missing SpaCy model '{spacy_model}'. Please update `requirements.txt` to include it.")
+    st.stop()
+
+# ---------------- Load API Key from Streamlit Secrets ----------------
+api_key = st.secrets.get("GOOGLE_API_KEY")
+
+if not api_key:
+    st.error("⚠️ API key is missing! Add it in Streamlit Secrets.")
+    st.stop()
+
+genai.configure(api_key=api_key)
 
 # ---------------- Load API Key from Streamlit Secrets ----------------
 api_key = st.secrets.get("GOOGLE_API_KEY")
