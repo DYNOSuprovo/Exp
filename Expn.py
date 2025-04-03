@@ -1,28 +1,11 @@
 import os
 import streamlit as st
 import google.generativeai as genai
-import os
-import streamlit as st
-import google.generativeai as genai
-import spacy
+import nltk
+from nltk.tokenize import word_tokenize
 
-# ---------------- Ensure SpaCy Model is Installed ----------------
-spacy_model = "en_core_web_sm"
-
-try:
-    nlp = spacy.load(spacy_model)
-except OSError:
-    st.error(f"⚠️ Missing SpaCy model '{spacy_model}'. Please update `requirements.txt` to include it.")
-    st.stop()
-
-# ---------------- Load API Key from Streamlit Secrets ----------------
-api_key = st.secrets.get("GOOGLE_API_KEY")
-
-if not api_key:
-    st.error("⚠️ API key is missing! Add it in Streamlit Secrets.")
-    st.stop()
-
-genai.configure(api_key=api_key)
+# ---------------- Ensure NLTK Data is Available ----------------
+nltk.download("punkt")
 
 # ---------------- Load API Key from Streamlit Secrets ----------------
 api_key = st.secrets.get("GOOGLE_API_KEY")
@@ -62,9 +45,10 @@ user_expense_input = st.text_area("Describe any other expenses (optional)")
 
 # Function to get pre-trained answer
 def get_pretrained_answer(query):
-    doc = nlp(query.lower())
+    tokens = word_tokenize(query.lower())
     for q in pre_trained_qa:
-        if all(token.text in q for token in doc):
+        q_tokens = word_tokenize(q)
+        if all(token in q_tokens for token in tokens):
             return pre_trained_qa[q]
     return None
 
