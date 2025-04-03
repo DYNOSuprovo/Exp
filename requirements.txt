@@ -1,5 +1,5 @@
 streamlit
 google-generativeai
 spacy
+spacy-models/en_core_web_sm
 python-dotenv
-spacy
