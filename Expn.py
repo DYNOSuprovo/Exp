@@ -2,7 +2,6 @@ import os
 import streamlit as st
 import google.generativeai as genai
 import spacy
-import subprocess
 
 # ---------------- Ensure SpaCy Model is Installed ----------------
 spacy_model = "en_core_web_sm"
@@ -10,17 +9,17 @@ spacy_model = "en_core_web_sm"
 try:
     nlp = spacy.load(spacy_model)
 except OSError:
-    st.warning("Downloading missing SpaCy model...")
-    subprocess.run(["python", "-m", "spacy", "download", spacy_model])
-    nlp = spacy.load(spacy_model)
+    st.error(f"⚠️ Missing SpaCy model '{spacy_model}'. Please install it manually.")
+    st.stop()
 
 # ---------------- Load API Key from Streamlit Secrets ----------------
-api_key = st.secrets["GOOGLE_API_KEY"]
+api_key = st.secrets.get("GOOGLE_API_KEY")
 
-if api_key:
-    genai.configure(api_key=api_key)
-else:
-    st.error("⚠️ API key is missing! Please add it in Streamlit Secrets.")
+if not api_key:
+    st.error("⚠️ API key is missing! Add it in Streamlit Secrets.")
+    st.stop()
+
+genai.configure(api_key=api_key)
 
 # ---------------- Pre-trained Q&A ----------------
 pre_trained_qa = {
@@ -37,36 +36,29 @@ st.write("Adjust your income and expenses to get budget advice.")
 
 # Sliders for user input (INR instead of USD)
 income = st.slider("Monthly Income (₹)", 500, 50000, 25000)
-rent = st.slider("Rent/Mortgage (₹)", 0, 20000, 10000)
-food = st.slider("Food Expenses (₹)", 0, 15000, 5000)
-transport = st.slider("Transport (₹)", 0, 5000, 2000)
-entertainment = st.slider("Entertainment (₹)", 0, 5000, 1000)
-savings = st.slider("Savings (₹)", 0, 20000, 5000)
+expenses = {
+    "rent": st.slider("Rent/Mortgage (₹)", 0, 20000, 10000),
+    "food": st.slider("Food Expenses (₹)", 0, 15000, 5000),
+    "transport": st.slider("Transport (₹)", 0, 5000, 2000),
+    "entertainment": st.slider("Entertainment (₹)", 0, 5000, 1000),
+    "savings": st.slider("Savings (₹)", 0, 20000, 5000),
+}
 
-# User inputs a budgeting question
+# User inputs
 user_question = st.text_input("Ask a budgeting question:")
+user_expense_input = st.text_area("Describe any other expenses (optional)")
 
-# Function to find the best-matching question
-def get_pretrained_answer(user_query):
-    doc = nlp(user_query.lower())
+# Function to get pre-trained answer
+def get_pretrained_answer(query):
+    doc = nlp(query.lower())
     for q in pre_trained_qa:
         if all(token.text in q for token in doc):
             return pre_trained_qa[q]
     return None
 
-# Other expenses input
-user_expense_input = st.text_area("Describe any other expenses (optional)")
-expenses = {
-    "rent": rent,
-    "food": food,
-    "transport": transport,
-    "entertainment": entertainment,
-    "savings": savings
-}
-
 # Function to get AI-generated advice
 def get_gemini_advice(expenses, income, user_input=""):
-    """Sends expense details to Gemini API for analysis and personalized financial advice."""
+    """Sends expense details to Gemini API for personalized financial advice."""
     prompt = f"""
     My monthly income is ₹{income}. Here are my expenses: {expenses}.
     {user_input}
@@ -79,17 +71,13 @@ def get_gemini_advice(expenses, income, user_input=""):
     except Exception as e:
         return f"⚠️ Error getting AI advice: {e}"
 
-# If user asks a budgeting question
+# Process user question
 if user_question:
     answer = get_pretrained_answer(user_question)
-    if answer:
-        st.subheader("💡 Pre-trained Answer:")
-        st.write(answer)
-    else:
-        st.subheader("💡 AI Generated Answer:")
-        st.write(get_gemini_advice(expenses, income, user_question))
+    st.subheader("💡 Answer:")
+    st.write(answer if answer else get_gemini_advice(expenses, income, user_question))
 
-# Button to get AI budget advice
+# AI Budget Advice Button
 if st.button("Get AI Budget Advice"):
     advice = get_gemini_advice(expenses, income, user_expense_input)
     st.subheader("💡 AI Advice:")
