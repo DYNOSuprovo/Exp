@@ -1,19 +1,24 @@
 import os
 import streamlit as st
 import google.generativeai as genai
-import nltk
-from nltk.tokenize import word_tokenize
+import spacy
+from spacy.cli import download
+from difflib import SequenceMatcher
 
-# ---------------- Ensure NLTK Data is Available ----------------
-nltk.download("punkt")
+# ---------------- Ensure SpaCy Model is Installed ----------------
+spacy_model = "en_core_web_sm"
+try:
+    nlp = spacy.load(spacy_model)
+except OSError:
+    st.warning(f"⚠️ SpaCy model '{spacy_model}' missing. Downloading...")
+    download(spacy_model)  # Download model
+    nlp = spacy.load(spacy_model)  # Reload after download
 
 # ---------------- Load API Key from Streamlit Secrets ----------------
-api_key = st.secrets.get("GOOGLE_API_KEY")
-
-if not api_key:
-    st.error("⚠️ API key is missing! Add it in Streamlit Secrets.")
+if "GOOGLE_API_KEY" not in st.secrets:
+    st.error("⚠️ Missing API key! Add it in Streamlit Secrets.")
     st.stop()
-
+api_key = st.secrets["GOOGLE_API_KEY"]
 genai.configure(api_key=api_key)
 
 # ---------------- Pre-trained Q&A ----------------
@@ -45,12 +50,17 @@ user_expense_input = st.text_area("Describe any other expenses (optional)")
 
 # Function to get pre-trained answer
 def get_pretrained_answer(query):
-    tokens = word_tokenize(query.lower())
+    query = query.lower()
+    best_match = None
+    best_score = 0.5  # Minimum match threshold
+
     for q in pre_trained_qa:
-        q_tokens = word_tokenize(q)
-        if all(token in q_tokens for token in tokens):
-            return pre_trained_qa[q]
-    return None
+        similarity = SequenceMatcher(None, query, q).ratio()
+        if similarity > best_score:
+            best_score = similarity
+            best_match = q
+
+    return pre_trained_qa.get(best_match, None)
 
 # Function to get AI-generated advice
 def get_gemini_advice(expenses, income, user_input=""):
@@ -62,8 +72,12 @@ def get_gemini_advice(expenses, income, user_input=""):
     Provide specific, actionable tips.
     """
     try:
-        response = genai.GenerativeModel("gemini-1.5-pro").generate_content(prompt)
-        return response.text
+        model = genai.GenerativeModel("gemini-1.5-pro")
+        response = model.generate_content(prompt)
+        
+        if response and response.candidates:
+            return response.candidates[0].content.parts[0].text
+        return "⚠️ No response received from Gemini API."
     except Exception as e:
         return f"⚠️ Error getting AI advice: {e}"
 
