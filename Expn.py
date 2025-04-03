@@ -3,14 +3,12 @@ import streamlit as st
 import google.generativeai as genai
 import spacy
 
-# ---------------- Ensure SpaCy Model is Installed ----------------
-spacy_model = "en_core_web_sm"
-
 try:
-    nlp = spacy.load(spacy_model)
+    nlp = spacy.load("en_core_web_sm")
 except OSError:
-    st.error(f"⚠️ Missing SpaCy model '{spacy_model}'. Please install it manually.")
-    st.stop()
+    from spacy.cli import download
+    download("en_core_web_sm")
+    nlp = spacy.load("en_core_web_sm")
 
 # ---------------- Load API Key from Streamlit Secrets ----------------
 api_key = st.secrets.get("GOOGLE_API_KEY")
